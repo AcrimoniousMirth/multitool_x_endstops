@@ -41,8 +41,5 @@ class ProbeEndstopWrapper:
         self.home_wait = self.mcu_endstop.home_wait
         self.query_endstop = self.mcu_endstop.query_endstop
 
-    def get_position_endstop(self):
-        return 0.
-
 def load_config_prefix(config):
     return ToolXEndstop(config)

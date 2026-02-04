@@ -108,10 +108,13 @@ class EndstopRouter:
             self.home_wait = self.active_mcu.home_wait
             self.query_endstop = self.active_mcu.query_endstop
         else:
-            self.get_mcu = self.on_error
+            self.get_mcu = self.get_default_mcu
             self.home_start = self.on_error
             self.home_wait = self.on_error
             self.query_endstop = self.on_error
+
+    def get_default_mcu(self):
+        return self.printer.lookup_object('mcu')
 
     def add_stepper(self, stepper):
         self._steppers.append(stepper)
@@ -123,11 +126,6 @@ class EndstopRouter:
 
     def on_error(self, *args, **kwargs):
         raise self.printer.command_error("Cannot interact with X endstop - no active tool detected.")
-
-    def get_position_endstop(self):
-        if not self.active_mcu:
-            return 0.0
-        return self.active_mcu.get_position_endstop()
 
 def load_config(config):
     return ToolXRouter(config)
