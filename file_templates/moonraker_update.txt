@@ -1,0 +1,5 @@
+[update_manager multitool_x_endstops]
+type: git_repo
+path: ~/multitool_x_endstops
+origin: https://github.com/AcrimoniousMirth/multitool_x_endstops.git
+is_system_service: False
