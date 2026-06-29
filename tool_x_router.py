@@ -18,6 +18,8 @@ class ToolXRouter:
         
         self.printer.register_event_handler("homing:home_rails_begin",
                                             self._handle_home_rails_begin)
+        self.printer.register_event_handler("homing:home_rails_end",
+                                            self._handle_home_rails_end)
         self.printer.register_event_handler('klippy:connect',
                                             self._handle_connect)
 
@@ -69,6 +71,13 @@ class ToolXRouter:
         
         self.set_active_tool(detected_tool)
 
+    def _handle_home_rails_end(self, homing_state, rails):
+        logging.info("tool_x_router: Homing complete. Clearing X endstop lock.")
+        # Reset so that subsequent QUERY_ENDSTOPS and future homing runs
+        # resolve the active tool dynamically rather than using the stale cache.
+        self.mcu_router.set_active_mcu(None)
+        self.active_tool_number = -1
+
     def set_active_tool(self, tool_number):
         if self.active_tool_number == tool_number:
             return
@@ -80,7 +89,8 @@ class ToolXRouter:
             self.mcu_router.set_active_mcu(tool_endstop.mcu_endstop)
             self.active_tool_number = tool_number
         else:
-            logging.warning("tool_x_router: No ToolXEndstop configured for T%d" % tool_number)
+            if tool_number != -1:
+                logging.warning("tool_x_router: No ToolXEndstop configured for T%d" % tool_number)
             self.mcu_router.set_active_mcu(None)
             self.active_tool_number = -1
 
