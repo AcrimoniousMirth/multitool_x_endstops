@@ -92,7 +92,6 @@ class EndstopRouter:
         self.active_mcu = None
         self._mcus = []
         self._steppers = []
-        self.set_active_mcu(None)
 
     def add_mcu(self, mcu_endstop):
         self._mcus.append(mcu_endstop)
@@ -101,20 +100,50 @@ class EndstopRouter:
 
     def set_active_mcu(self, mcu_endstop):
         self.active_mcu = mcu_endstop
-        # Update Wrappers
-        if self.active_mcu:
-            self.get_mcu = self.active_mcu.get_mcu
-            self.home_start = self.active_mcu.home_start
-            self.home_wait = self.active_mcu.home_wait
-            self.query_endstop = self.active_mcu.query_endstop
-        else:
-            self.get_mcu = self.get_default_mcu
-            self.home_start = self.on_error
-            self.home_wait = self.on_error
-            self.query_endstop = self.on_error
 
-    def get_default_mcu(self):
+    def _resolve_active_mcu(self):
+        if self.active_mcu:
+            return self.active_mcu
+        router = self.printer.lookup_object('tool_x_router', None)
+        if not router:
+            return None
+        detected_tool = -1
+        if router.tool_probe_endstop:
+            status = router.tool_probe_endstop.get_status(self.printer.get_reactor().monotonic())
+            detected_tool = status.get('active_tool_number', -1)
+        if detected_tool == -1:
+            toolchanger = self.printer.lookup_object('toolchanger', None)
+            if toolchanger and toolchanger.active_tool:
+                tool_obj = toolchanger.active_tool
+                detected_tool = tool_obj.params.get('params_physical_toolhead', tool_obj.tool_number)
+        tool_endstop = router.tool_endstops.get(detected_tool)
+        if tool_endstop:
+            return tool_endstop.mcu_endstop
+        return None
+
+    def get_mcu(self):
+        active_mcu = self._resolve_active_mcu()
+        if active_mcu:
+            return active_mcu.get_mcu()
         return self.printer.lookup_object('mcu')
+
+    def home_start(self, *args, **kwargs):
+        active_mcu = self._resolve_active_mcu()
+        if not active_mcu:
+            raise self.printer.command_error("Cannot interact with X endstop - no active tool detected.")
+        return active_mcu.home_start(*args, **kwargs)
+
+    def home_wait(self, *args, **kwargs):
+        active_mcu = self._resolve_active_mcu()
+        if not active_mcu:
+            raise self.printer.command_error("Cannot interact with X endstop - no active tool detected.")
+        return active_mcu.home_wait(*args, **kwargs)
+
+    def query_endstop(self, *args, **kwargs):
+        active_mcu = self._resolve_active_mcu()
+        if not active_mcu:
+            raise self.printer.command_error("Cannot interact with X endstop - no active tool detected.")
+        return active_mcu.query_endstop(*args, **kwargs)
 
     def add_stepper(self, stepper):
         self._steppers.append(stepper)
@@ -123,9 +152,6 @@ class EndstopRouter:
             
     def get_steppers(self):
         return list(self._steppers)
-
-    def on_error(self, *args, **kwargs):
-        raise self.printer.command_error("Cannot interact with X endstop - no active tool detected.")
 
 def load_config(config):
     return ToolXRouter(config)
